@@ -6,13 +6,52 @@ import Piece from './components/Piece';
 import GameInfo from './components/GameInfo';
 import GameControls from './components/GameControls';
 import type { Piece as PieceType, Position } from './types/chess';
-import { calculateStageSize, screenToBoard } from './utils/coordinates';
+import { calculateStageSize, screenToBoard, DEFAULT_PIECE_RADIUS } from './utils/coordinates';
 import { isInCheck } from './utils/rules';
 import { initSpeechSynthesis } from './utils/sounds';
+import { getAllThemes } from './utils/pieceThemes';
+import type { PieceThemeId } from './types/pieceTheme';
+import { getAllBoardThemes } from './utils/boardThemes';
+import type { BoardThemeId } from './types/boardTheme';
 
 function App() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [stageSize, setStageSize] = useState({ width: 600, height: 667 });
+  const [pieceThemeId, setPieceThemeId] = useState<PieceThemeId>(() => {
+    // 从localStorage读取保存的主题，如果没有则使用默认主题
+    const saved = localStorage.getItem('chineseChessPieceTheme');
+    return (saved as PieceThemeId) || 'neumorphic';
+  });
+  const [pieceRadius, setPieceRadius] = useState<number>(() => {
+    // 从localStorage读取保存的棋子大小，如果没有则使用默认值
+    const saved = localStorage.getItem('chineseChessPieceRadius');
+    return saved ? Number(saved) : DEFAULT_PIECE_RADIUS;
+  });
+
+  const [boardThemeId, setBoardThemeId] = useState<BoardThemeId>(() => {
+    const saved = localStorage.getItem('chineseChessBoardTheme');
+    return (saved as BoardThemeId) || 'paper';
+  });
+
+  // 保存主题选择
+  const handleThemeChange = useCallback((themeId: PieceThemeId) => {
+    setPieceThemeId(themeId);
+    localStorage.setItem('chineseChessPieceTheme', themeId);
+  }, []);
+
+  const handleBoardThemeChange = useCallback((themeId: BoardThemeId) => {
+    setBoardThemeId(themeId);
+    localStorage.setItem('chineseChessBoardTheme', themeId);
+  }, []);
+
+  // 保存棋子大小选择
+  const handlePieceRadiusChange = useCallback((radius: number) => {
+    setPieceRadius(radius);
+    localStorage.setItem('chineseChessPieceRadius', String(radius));
+  }, []);
+
+  const themes = getAllThemes();
+  const boardThemes = getAllBoardThemes();
 
   const {
     gameState,
@@ -148,7 +187,8 @@ function App() {
         pointerPos.x,
         pointerPos.y,
         stageSize.width,
-        stageSize.height
+        stageSize.height,
+        pieceRadius
       );
 
       if (boardPos) {
@@ -188,6 +228,8 @@ function App() {
                   draggingPiece={draggingPiece}
                   stageWidth={stageSize.width}
                   stageHeight={stageSize.height}
+                  pieceRadius={pieceRadius}
+                  boardThemeId={boardThemeId}
                 />
               </Layer>
 
@@ -205,6 +247,8 @@ function App() {
                     isDragging={draggingPiece?.id === piece.id}
                     stageWidth={stageSize.width}
                     stageHeight={stageSize.height}
+                    themeId={pieceThemeId}
+                    pieceRadius={pieceRadius}
                   />
                 ))}
               </Layer>
@@ -220,6 +264,75 @@ function App() {
           canUndo={gameState.moves.length > 0}
           canLoad={hasSavedGame()}
         />
+
+        {/* 棋子大小选择器 */}
+        <div className="mt-4 bg-white rounded-lg shadow-lg p-4">
+          <h3 className="text-lg font-semibold mb-3 text-center text-amber-900">
+            棋子大小
+          </h3>
+          <div className="flex gap-3 justify-center items-center">
+            <span className="text-sm text-amber-700">小</span>
+            <input
+              type="range"
+              min="16"
+              max="40"
+              step="2"
+              value={pieceRadius}
+              onChange={(e) => handlePieceRadiusChange(Number(e.target.value))}
+              className="flex-1 max-w-xs h-2 bg-amber-200 rounded-lg appearance-none cursor-pointer accent-amber-600"
+            />
+            <span className="text-sm text-amber-700">大</span>
+            <span className="ml-4 text-sm font-medium text-amber-900 min-w-12 text-center">
+              {pieceRadius}px
+            </span>
+          </div>
+        </div>
+
+        {/* 棋子主题选择器 */}
+        <div className="mt-4 bg-white rounded-lg shadow-lg p-4">
+          <h3 className="text-lg font-semibold mb-3 text-center text-amber-900">
+            棋子主题
+          </h3>
+          <div className="flex gap-3 justify-center flex-wrap">
+            {themes.map((theme) => (
+              <button
+                key={theme.id}
+                onClick={() => handleThemeChange(theme.id)}
+                className={`px-4 py-2 rounded-lg transition-all ${
+                  pieceThemeId === theme.id
+                    ? 'bg-amber-600 text-white shadow-md scale-105'
+                    : 'bg-amber-100 text-amber-900 hover:bg-amber-200'
+                }`}
+              >
+                <div className="font-medium">{theme.name}</div>
+                <div className="text-xs opacity-75">{theme.description}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 棋盘主题选择器 */}
+        <div className="mt-4 bg-white rounded-lg shadow-lg p-4">
+          <h3 className="text-lg font-semibold mb-3 text-center text-amber-900">
+            棋盘主题
+          </h3>
+          <div className="flex gap-3 justify-center flex-wrap">
+            {boardThemes.map((theme) => (
+              <button
+                key={theme.id}
+                onClick={() => handleBoardThemeChange(theme.id)}
+                className={`px-4 py-2 rounded-lg transition-all ${
+                  boardThemeId === theme.id
+                    ? 'bg-amber-600 text-white shadow-md scale-105'
+                    : 'bg-amber-100 text-amber-900 hover:bg-amber-200'
+                }`}
+              >
+                <div className="font-medium">{theme.name}</div>
+                <div className="text-xs opacity-75">{theme.description}</div>
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );

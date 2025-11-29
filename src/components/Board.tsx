@@ -1,7 +1,10 @@
-import { useMemo, memo } from 'react';
+import { useMemo, memo, useState, useEffect } from 'react';
 import { Line, Rect, Text, Circle } from 'react-konva';
 import type { Position, Piece } from '../types/chess';
+import type { BoardThemeId } from '../types/boardTheme';
+import { getBoardTheme } from '../utils/boardThemes';
 import { BOARD_COLS, BOARD_ROWS, getIntersectionPosition, getBoardArea } from '../utils/coordinates';
+import marbleTexture from '../assets/dalishi.png';
 
 interface BoardProps {
   board: (Piece | null)[][];
@@ -10,6 +13,8 @@ interface BoardProps {
   draggingPiece?: Piece | null;
   stageWidth: number;
   stageHeight: number;
+  pieceRadius?: number;
+  boardThemeId: BoardThemeId;
 }
 
 function BoardComponent({
@@ -19,10 +24,29 @@ function BoardComponent({
   draggingPiece,
   stageWidth,
   stageHeight,
+  pieceRadius = 30,
+  boardThemeId,
 }: BoardProps) {
   // 获取棋盘绘制区域（考虑边距）
-  const area = useMemo(() => getBoardArea(stageWidth, stageHeight), [stageWidth, stageHeight]);
+  const area = useMemo(() => getBoardArea(stageWidth, stageHeight, pieceRadius), [stageWidth, stageHeight, pieceRadius]);
   const { boardX, boardY, boardWidth, boardHeight, cellWidth, cellHeight } = area;
+
+  // 根据主题切换棋盘整体风格
+  const theme = getBoardTheme(boardThemeId);
+  const { lineColor, labelColor, labelOpacity, numberOpacity, backgroundType, backgroundColor, gradientStops } = theme;
+
+  // 纹理背景图片（例如大理石纹理）
+  const [textureImage, setTextureImage] = useState<HTMLImageElement | null>(null);
+
+  useEffect(() => {
+    if (backgroundType !== 'texture') return;
+
+    const img = new Image();
+    img.src = marbleTexture;
+    img.onload = () => {
+      setTextureImage(img);
+    };
+  }, [backgroundType]);
 
   // 生成所有交叉点
   const intersections = useMemo(() => {
@@ -43,13 +67,13 @@ function BoardComponent({
         <Line
           key={`h-${y}`}
           points={[boardX, yPos, boardX + boardWidth, yPos]}
-          stroke="#8B4513"
+          stroke={lineColor}
           strokeWidth={2}
           lineCap="round"
         />
       );
     });
-  }, [boardX, boardY, boardWidth, cellHeight]);
+  }, [boardX, boardY, boardWidth, cellHeight, lineColor]);
 
   // 绘制竖线（保留两边的竖线完整，中间竖线在楚河汉界区域断开）
   const verticalLines = useMemo(() => {
@@ -65,7 +89,7 @@ function BoardComponent({
           <Line
             key={`v-${x}`}
             points={[xPos, boardY, xPos, boardY + boardHeight]}
-            stroke="#8B4513"
+            stroke={lineColor}
             strokeWidth={2}
             lineCap="round"
           />
@@ -77,7 +101,7 @@ function BoardComponent({
         <Line
           key={`v-top-${x}`}
           points={[xPos, boardY, xPos, riverTopY]}
-          stroke="#8B4513"
+          stroke={lineColor}
           strokeWidth={2}
           lineCap="round"
         />
@@ -86,14 +110,14 @@ function BoardComponent({
         <Line
           key={`v-bottom-${x}`}
           points={[xPos, riverBottomY, xPos, boardY + boardHeight]}
-          stroke="#8B4513"
+          stroke={lineColor}
           strokeWidth={2}
           lineCap="round"
         />
       );
       return [topLine, bottomLine];
     }).flat();
-  }, [boardX, boardY, boardHeight, cellWidth, cellHeight]);
+  }, [boardX, boardY, boardHeight, cellWidth, cellHeight, lineColor]);
 
   // 绘制九宫格斜线（交叉线）
   const palaceLines = useMemo(() => {
@@ -111,7 +135,7 @@ function BoardComponent({
       <Line
         key="palace-top-diag-1"
         points={[topLeft.x, topLeft.y, topBottomRight.x, topBottomRight.y]}
-        stroke="#8B4513"
+        stroke={lineColor}
         strokeWidth={2}
         lineCap="round"
       />
@@ -121,7 +145,7 @@ function BoardComponent({
       <Line
         key="palace-top-diag-2"
         points={[topRight.x, topRight.y, topBottomLeft.x, topBottomLeft.y]}
-        stroke="#8B4513"
+        stroke={lineColor}
         strokeWidth={2}
         lineCap="round"
       />
@@ -139,7 +163,7 @@ function BoardComponent({
       <Line
         key="palace-bottom-diag-1"
         points={[bottomTopLeft.x, bottomTopLeft.y, bottomRight.x, bottomRight.y]}
-        stroke="#8B4513"
+        stroke={lineColor}
         strokeWidth={2}
         lineCap="round"
       />
@@ -149,19 +173,67 @@ function BoardComponent({
       <Line
         key="palace-bottom-diag-2"
         points={[bottomTopRight.x, bottomTopRight.y, bottomLeft.x, bottomLeft.y]}
-        stroke="#8B4513"
+        stroke={lineColor}
         strokeWidth={2}
         lineCap="round"
       />
     );
     
     return lines;
-  }, [boardX, boardY, cellWidth, cellHeight]);
+  }, [boardX, boardY, cellWidth, cellHeight, lineColor]);
+
+  // 绘制竖线数字标记
+  const columnNumbers = useMemo(() => {
+    return Array.from({ length: BOARD_COLS }, (_, x) => {
+      // 上方（黑方）：从左到右是1-9路
+      const topNumber = x + 1;
+      const topX = boardX + x * cellWidth;
+      const topY = boardY - 40; // 在棋盘上方，更靠近边缘，避免被棋子遮挡
+      
+      // 下方（红方）：从右到左是1-9路
+      const bottomNumber = BOARD_COLS - x;
+      const bottomX = boardX + x * cellWidth;
+      const bottomY = boardY + boardHeight + 40; // 在棋盘下方，更靠近边缘，避免被棋子遮挡
+      
+      return [
+        <Text
+          key={`top-number-${x}`}
+          x={topX}
+          y={topY}
+          text={String(topNumber)}
+          fontSize={18}
+          fontStyle="bold"
+          fill={labelColor}
+          opacity={numberOpacity}
+          align="center"
+          verticalAlign="middle"
+          offsetX={9}
+          offsetY={9}
+          listening={false}
+        />,
+        <Text
+          key={`bottom-number-${x}`}
+          x={bottomX}
+          y={bottomY}
+          text={String(bottomNumber)}
+          fontSize={18}
+          fontStyle="bold"
+          fill={labelColor}
+          opacity={numberOpacity}
+          align="center"
+          verticalAlign="middle"
+          offsetX={9}
+          offsetY={9}
+          listening={false}
+        />,
+      ];
+    }).flat();
+  }, [boardX, boardY, boardHeight, cellWidth, labelColor, numberOpacity]);
 
   // 绘制交叉点提示
   const intersectionHints = useMemo(() => {
     return intersections.map((pos) => {
-      const { x, y } = getIntersectionPosition(pos.x, pos.y, stageWidth, stageHeight);
+      const { x, y } = getIntersectionPosition(pos.x, pos.y, stageWidth, stageHeight, pieceRadius);
       const piece = board[pos.y][pos.x];
       const isSelected = selectedPosition?.x === pos.x && selectedPosition?.y === pos.y;
       const isValidMove = validMoves.some((move) => move.x === pos.x && move.y === pos.y);
@@ -197,12 +269,36 @@ function BoardComponent({
         />
       );
     });
-  }, [intersections, board, selectedPosition, validMoves, draggingPiece, stageWidth, stageHeight]);
+  }, [intersections, board, selectedPosition, validMoves, draggingPiece, stageWidth, stageHeight, pieceRadius]);
 
   return (
     <>
       {/* 棋盘背景 */}
-      <Rect x={0} y={0} width={stageWidth} height={stageHeight} fill="#FEF3C7" />
+      {backgroundType === 'texture' && textureImage ? (
+        <Rect
+          x={0}
+          y={0}
+          width={stageWidth}
+          height={stageHeight}
+          fillPatternImage={textureImage}
+          fillPatternScale={{
+            x: stageWidth / textureImage.width,
+            y: stageHeight / textureImage.height,
+          }}
+        />
+      ) : backgroundType === 'gradient' && gradientStops ? (
+        <Rect
+          x={0}
+          y={0}
+          width={stageWidth}
+          height={stageHeight}
+          fillLinearGradientStartPoint={{ x: 0, y: 0 }}
+          fillLinearGradientEndPoint={{ x: stageWidth, y: stageHeight }}
+          fillLinearGradientColorStops={gradientStops.flatMap((s) => [s.offset, s.color])}
+        />
+      ) : (
+        <Rect x={0} y={0} width={stageWidth} height={stageHeight} fill={backgroundColor || '#FEF3C7'} />
+      )}
 
       {/* 横线 */}
       {horizontalLines}
@@ -220,8 +316,9 @@ function BoardComponent({
         text="楚河"
         fontSize={28}
         fontStyle="bold"
-        fill="#92400E"
-        opacity={0.4}
+        fontFamily="'KaiTi', '楷体', 'STKaiti'"
+        fill={labelColor}
+        opacity={labelOpacity}
         align="center"
         verticalAlign="middle"
         offsetX={28}
@@ -234,14 +331,18 @@ function BoardComponent({
         text="汉界"
         fontSize={28}
         fontStyle="bold"
-        fill="#92400E"
-        opacity={0.4}
+        fontFamily="'KaiTi', '楷体', 'STKaiti'"
+        fill={labelColor}
+        opacity={labelOpacity}
         align="center"
         verticalAlign="middle"
         offsetX={28}
         offsetY={14}
         listening={false}
       />
+
+      {/* 竖线数字标记 */}
+      {columnNumbers}
 
       {/* 交叉点提示 */}
       {intersectionHints}

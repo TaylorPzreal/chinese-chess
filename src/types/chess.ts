@@ -112,12 +112,12 @@ export function piecesToBoard(pieces: Piece[]): (Piece | null)[][] {
 // 获取棋子显示名称
 export function getPieceName(piece: Piece): string {
   const names: Record<PieceType, { red: string; black: string }> = {
-    king: { red: '帅', black: '将' },
+    king: { red: '帥', black: '將' },
     advisor: { red: '仕', black: '士' },
     elephant: { red: '相', black: '象' },
-    horse: { red: '马', black: '马' },
-    rook: { red: '车', black: '车' },
-    cannon: { red: '炮', black: '炮' },
+    horse: { red: '馬', black: '馬' },
+    rook: { red: '車', black: '車' },
+    cannon: { red: '炮', black: '砲' },
     pawn: { red: '兵', black: '卒' },
   };
   return names[piece.type][piece.color];

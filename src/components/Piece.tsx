@@ -1,9 +1,11 @@
 import { memo, useRef, useEffect, useCallback } from 'react';
-import { Group, Circle, Text } from 'react-konva';
+import { Group } from 'react-konva';
 import type { Piece as PieceType, Position } from '../types/chess';
 import { getPieceName } from '../types/chess';
 import { playSelectSound } from '../utils/sounds';
 import { boardToScreen, screenToBoard } from '../utils/coordinates';
+import { getPieceTheme } from '../utils/pieceThemes';
+import type { PieceThemeId } from '../types/pieceTheme';
 
 interface PieceProps {
   piece: PieceType;
@@ -15,6 +17,8 @@ interface PieceProps {
   isDragging?: boolean;
   stageWidth: number;
   stageHeight: number;
+  themeId?: PieceThemeId;
+  pieceRadius?: number;
 }
 
 function PieceComponent({
@@ -27,13 +31,19 @@ function PieceComponent({
   isDragging = false,
   stageWidth,
   stageHeight,
+  themeId = 'neumorphic',
+  pieceRadius = 30,
 }: PieceProps) {
   const groupRef = useRef<any>(null);
   const pieceName = getPieceName(piece);
   const isRed = piece.color === 'red';
 
+  // 获取主题
+  const theme = getPieceTheme(themeId);
+  const colors = isRed ? theme.red : theme.black;
+
   // 计算屏幕坐标
-  const screenPos = boardToScreen(position.x, position.y, stageWidth, stageHeight);
+  const screenPos = boardToScreen(position.x, position.y, stageWidth, stageHeight, pieceRadius);
 
   // 处理点击
   const handleClick = useCallback(
@@ -64,7 +74,7 @@ function PieceComponent({
       
       if (pointerPos) {
         // 使用统一的坐标转换函数
-        const boardPos = screenToBoard(pointerPos.x, pointerPos.y, stageWidth, stageHeight);
+        const boardPos = screenToBoard(pointerPos.x, pointerPos.y, stageWidth, stageHeight, pieceRadius);
         
         if (boardPos) {
           // 先验证移动是否合法
@@ -74,33 +84,33 @@ function PieceComponent({
           
           if (moveSuccess) {
             // 移动成功，对齐到交叉点（position prop 会更新，useEffect 会处理动画）
-            const snapPos = boardToScreen(boardPos.x, boardPos.y, stageWidth, stageHeight);
+            const snapPos = boardToScreen(boardPos.x, boardPos.y, stageWidth, stageHeight, pieceRadius);
             node.position({ x: snapPos.x, y: snapPos.y });
           } else {
             // 移动失败，立即移回原位置
-            const originalPos = boardToScreen(position.x, position.y, stageWidth, stageHeight);
+            const originalPos = boardToScreen(position.x, position.y, stageWidth, stageHeight, pieceRadius);
             node.position({ x: originalPos.x, y: originalPos.y });
           }
         } else {
           // 超出范围，移回原位置
-          const originalPos = boardToScreen(position.x, position.y, stageWidth, stageHeight);
+          const originalPos = boardToScreen(position.x, position.y, stageWidth, stageHeight, pieceRadius);
           node.position({ x: originalPos.x, y: originalPos.y });
           onDragEnd(piece, null);
         }
       } else {
         // 没有指针位置，移回原位置
-        const originalPos = boardToScreen(position.x, position.y, stageWidth, stageHeight);
+        const originalPos = boardToScreen(position.x, position.y, stageWidth, stageHeight, pieceRadius);
         node.position({ x: originalPos.x, y: originalPos.y });
         onDragEnd(piece, null);
       }
     },
-    [onDragEnd, piece, position, stageWidth, stageHeight]
+    [onDragEnd, piece, position, stageWidth, stageHeight, pieceRadius]
   );
 
   // 动画：移动到新位置（仅在位置真正改变时）
   useEffect(() => {
     if (groupRef.current && !isDragging) {
-      const newPos = boardToScreen(position.x, position.y, stageWidth, stageHeight);
+      const newPos = boardToScreen(position.x, position.y, stageWidth, stageHeight, pieceRadius);
       const currentPos = groupRef.current.position();
       
       // 计算位置差异
@@ -124,15 +134,10 @@ function PieceComponent({
         groupRef.current.position({ x: newPos.x, y: newPos.y });
       }
     }
-  }, [position, stageWidth, stageHeight, isDragging]);
+  }, [position, stageWidth, stageHeight, isDragging, pieceRadius]);
 
-  // 棋子半径
-  const radius = 24;
-
-  // 棋子颜色
-  const fillColor = isRed
-    ? ['#EF4444', '#DC2626'] // 红色渐变
-    : ['#1F2937', '#111827']; // 黑色渐变
+  // 使用传入的棋子半径
+  const radius = pieceRadius;
 
   return (
     <Group
@@ -143,59 +148,18 @@ function PieceComponent({
       onClick={handleClick}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
-      opacity={isDragging ? 0.7 : 1}
-      scaleX={isDragging ? 1.1 : 1}
-      scaleY={isDragging ? 1.1 : 1}
+      opacity={isDragging ? 0.85 : 1}
+      scaleX={isDragging ? 1.15 : 1}
+      scaleY={isDragging ? 1.15 : 1}
     >
-      {/* 选中状态的外圈 */}
-      {isSelected && (
-        <Circle
-          x={0}
-          y={0}
-          radius={radius + 6}
-          stroke="#3B82F6"
-          strokeWidth={4}
-          fill="transparent"
-          listening={false}
-        />
-      )}
-
-      {/* 棋子背景（圆形） */}
-      <Circle
-        x={0}
-        y={0}
-        radius={radius}
-        fill={fillColor[0]}
-        shadowColor="rgba(0, 0, 0, 0.3)"
-        shadowBlur={8}
-        shadowOffset={{ x: 2, y: 2 }}
-        shadowOpacity={0.6}
-      />
-
-      {/* 棋子边框 */}
-      <Circle
-        x={0}
-        y={0}
-        radius={radius}
-        stroke={fillColor[1]}
-        strokeWidth={3}
-        listening={false}
-      />
-
-      {/* 棋子文字 */}
-      <Text
-        x={0}
-        y={0}
-        text={pieceName}
-        fontSize={20}
-        fontStyle="bold"
-        fill="white"
-        align="center"
-        verticalAlign="middle"
-        offsetX={10}
-        offsetY={10}
-        listening={false}
-      />
+      {theme.renderPiece({
+        radius,
+        isRed,
+        pieceName,
+        isSelected,
+        isDragging,
+        colors,
+      })}
     </Group>
   );
 }
