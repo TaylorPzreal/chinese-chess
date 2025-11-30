@@ -191,7 +191,8 @@ function BoardComponent({
       const topY = boardY - 40; // 在棋盘上方，更靠近边缘，避免被棋子遮挡
       
       // 下方（红方）：从右到左是1-9路
-      const bottomNumber = BOARD_COLS - x;
+      const numZh = ['一', '二', '三', '四', '五', '六', '七', '八', '九'];
+      const bottomNumber = numZh[BOARD_COLS - x - 1];
       const bottomX = boardX + x * cellWidth;
       const bottomY = boardY + boardHeight + 40; // 在棋盘下方，更靠近边缘，避免被棋子遮挡
       
